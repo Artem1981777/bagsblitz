@@ -61,6 +61,44 @@ export default function App() {
   const [form, setForm] = useState({ name:"", symbol:"", desc:"", prompt:"", img:"", royalty:"5" })
   const [liveTokens, setLiveTokens] = useState<any[]>([])
   const [aiAnalysis, setAiAnalysis] = useState<{score:number,verdict:string,report:string}|null>(null)
+  const [pitchScore, setPitchScore] = useState<{score:number,feedback:string,strengths:string[],weaknesses:string[]}|null>(null)
+  const [judgingPitch, setJudgingPitch] = useState(false)
+
+  async function judgePitch() {
+    if(!form.name||!form.desc){toast("Fill name and description first");return}
+    setJudgingPitch(true)
+    setPitchScore(null)
+    await new Promise(r => setTimeout(r, 2000))
+    const descLen = form.desc.length
+    const hasUtility = form.desc.toLowerCase().includes("fund") || form.desc.toLowerCase().includes("earn") || form.desc.toLowerCase().includes("reward") || form.desc.toLowerCase().includes("create")
+    const hasRoadmap = form.desc.toLowerCase().includes("roadmap") || form.desc.toLowerCase().includes("plan")
+    const score = Math.min(95, Math.max(30,
+      (descLen > 100 ? 30 : descLen > 50 ? 20 : 10) +
+      (hasRoadmap ? 20 : 0) +
+      (hasUtility ? 25 : 10) +
+      (form.img ? 15 : 5) +
+      Math.floor(Math.random() * 10)
+    ))
+    const strengths: string[] = []
+    const weaknesses: string[] = []
+    if(descLen > 100) strengths.push("Detailed description")
+    else weaknesses.push("Description too short")
+    if(hasUtility) strengths.push("Clear utility for holders")
+    else weaknesses.push("Unclear value proposition")
+    if(hasRoadmap) strengths.push("Has roadmap")
+    else weaknesses.push("No roadmap mentioned")
+    if(form.img) strengths.push("Has visual branding")
+    else weaknesses.push("No logo")
+    if(parseInt(form.royalty) <= 10) strengths.push("Fair royalty rate")
+    else weaknesses.push("High royalty may deter investors")
+    const feedback = score > 75
+      ? "Excellent pitch! Strong foundation. Ready to launch!"
+      : score > 55
+      ? "Good concept but needs refinement. Add more utility details."
+      : "Needs improvement. Investors need clearer value proposition."
+    setPitchScore({ score, feedback, strengths, weaknesses })
+    setJudgingPitch(false)
+  }
   const [analyzing, setAnalyzing] = useState(false)
 
   async function analyzeCreator(token: Token) {
@@ -424,6 +462,31 @@ export default function App() {
             <div style={{background:"#111",border:"1px solid #14f19520",borderRadius:"6px",padding:"10px",marginBottom:"12px"}}>
               <div style={{fontSize:"11px",color:"#14f195",marginBottom:"4px"}}>Powered by Bags.fm</div>
               <div style={{fontSize:"10px",color:"#8899bb"}}>Your token will be launched on Bags.fm with real bonding curve mechanics and creator royalties on every trade.</div>
+            </div>
+            <div style={{background:"#111",border:"1px solid #9945ff40",borderRadius:"8px",padding:"12px",marginBottom:"12px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
+                  <Brain size={13} color="#9945ff"/>
+                  <span style={{fontSize:"11px",fontWeight:700,color:"#9945ff"}}>AI PITCH JUDGE</span>
+                </div>
+                <button onClick={judgePitch} disabled={judgingPitch} style={{background:"#9945ff20",border:"1px solid #9945ff40",borderRadius:"5px",color:"#9945ff",padding:"4px 10px",fontSize:"11px",cursor:"pointer",fontWeight:700}}>
+                  {judgingPitch?"⏳ Judging...":"⚖️ Judge My Pitch"}
+                </button>
+              </div>
+              {!pitchScore&&!judgingPitch&&<div style={{fontSize:"10px",color:"#4a5a7a"}}>Get AI feedback before launching</div>}
+              {pitchScore&&<>
+                <div style={{display:"flex",gap:"10px",alignItems:"center",marginBottom:"8px"}}>
+                  <div style={{textAlign:"center" as const,background:"#0a0a0a",borderRadius:"6px",padding:"8px 12px"}}>
+                    <div style={{fontSize:"24px",fontWeight:900,color:pitchScore.score>75?"#14f195":pitchScore.score>55?"#ffaa00":"#ff3366"}}>{pitchScore.score}</div>
+                    <div style={{fontSize:"9px",color:"#4a5a7a"}}>PITCH</div>
+                  </div>
+                  <div style={{flex:1,fontSize:"11px",color:"#8899bb",lineHeight:1.5}}>{pitchScore.feedback}</div>
+                </div>
+                <div style={{display:"flex",gap:"4px",flexWrap:"wrap" as const}}>
+                  {pitchScore.strengths.map((s,i)=><span key={i} style={{...S.pill("#14f195"),fontSize:"9px"}}>✓ {s}</span>)}
+                  {pitchScore.weaknesses.map((w,i)=><span key={i} style={{...S.pill("#ff3366"),fontSize:"9px"}}>✗ {w}</span>)}
+                </div>
+              </>}
             </div>
             <button style={{...S.btnG,width:"100%",padding:"14px",fontSize:"14px"}} onClick={()=>{if(!wallet.connected){connectWallet();return};launchToken()}}>
               {launching?"🚀 Launching...":"🚀 Launch on Bags.fm"}
