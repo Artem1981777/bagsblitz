@@ -3,6 +3,8 @@ import { Rocket, Flame, Share2, Brain, Trophy } from "lucide-react"
 import { Connection, PublicKey } from "@solana/web3.js"
 
 const BAGS_API = "https://public-api-v2.bags.fm/api/v1"
+const BBLITZ_MINT = "GiiRMcD1Ci4o6vP3evycKTrpjYQfScL4xobmkNMcBAGS"
+const BBLITZ_URL = "https://bags.fm/token/" + BBLITZ_MINT
 const BAGS_KEY = (import.meta as any).env.VITE_BAGS_KEY
 const CLAUDE_API = "/api/claude"
 const SOLANA_RPC = "https://api.mainnet-beta.solana.com"
@@ -283,6 +285,18 @@ export default function App() {
           <button style={S.btnGhost} onClick={connectWallet}>
             {wallet.connected ? <span style={S.mono}>{wallet.address}</span> : "Connect"}
           </button>
+        </div>
+
+        {/* BBLITZ Token Banner */}
+        <div style={{background:"linear-gradient(135deg,#0a1a0a,#0a0a1a)",borderBottom:"1px solid #14f19530",padding:"8px 16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+            <span style={{fontSize:"16px"}}>👜</span>
+            <div>
+              <div style={{fontSize:"11px",fontWeight:700,color:"#14f195"}}>$BBLITZ is LIVE on Bags.fm!</div>
+              <div style={{fontSize:"9px",color:"#4a5a7a",fontFamily:"monospace"}}>{BBLITZ_MINT.slice(0,8)}...{BBLITZ_MINT.slice(-4)}</div>
+            </div>
+          </div>
+          <a href={BBLITZ_URL} target="_blank" rel="noreferrer" style={{background:"#14f19520",border:"1px solid #14f19540",borderRadius:"5px",color:"#14f195",padding:"4px 10px",fontSize:"11px",fontWeight:700,textDecoration:"none"}}>Trade →</a>
         </div>
 
         {/* Live Bags.fm tokens */}
