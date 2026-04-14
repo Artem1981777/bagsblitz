@@ -4,7 +4,7 @@ import { Connection, PublicKey } from "@solana/web3.js"
 
 const BAGS_API = "https://public-api-v2.bags.fm/api/v1"
 const BBLITZ_MINT = "GiiRMcD1Ci4o6vP3evycKTrpjYQfScL4xobmkNMcBAGS"
-const BBLITZ_URL = "https://bags.fm/coin/" + BBLITZ_MINT
+const BBLITZ_URL = "https://bags.fm/$BBLITZ"
 const BAGS_KEY = (import.meta as any).env.VITE_BAGS_KEY
 const CLAUDE_API = "/api/claude"
 const SOLANA_RPC = "https://api.mainnet-beta.solana.com"
