@@ -1,0 +1,24 @@
+Context: Analyze and evolve the existing codebase from: https://github.com/Artem1981777/bagsblitz.
+This project is the foundation for a high-stakes entry into The Bags Hackathon. We are moving from a CLI/Utility tool to a full-scale Autonomous Agent Infrastructure on Solana.
+​Goal: Transform BagsBlitz into a decentralized "Agentic Launchpad" that allows users to deploy AI-driven creator entities on Bags.fm.
+​Core Task: Deep Integration & Expansion
+​Codebase Assimilation: Use the existing logic in bagsblitz for wallet management and Solana interactions. Refactor the current structure to support a modular Plugin Architecture.
+​AI Engine (elizaOS Integration): * Integrate elizaOS core as the primary brain.
+​Map bagsblitz functions to custom Actions and Evaluators within the agent framework.
+​Enable the agent to monitor Bags.fm bonding curves and social sentiment in real-time.
+​The "Bags Mastery" Layer:
+​Implement automated Token Launching via @bagsfm/bags-sdk.
+​Royalty Management: Develop a "Yield-Optimizer" skill where the agent automatically claims royalties and reinvests them into Solana DeFi (Meteora DLMM or Kamino) to increase the floor price of the creator's token.
+​Professional Security Suite (Leveraging Developer Expertise): * Integrate a Pre-flight Security Check (inspired by DeFi auditing best practices). Every transaction must pass an automated "Safety Buffer" to prevent fat-finger errors or interacting with malicious drained contracts.
+​Add MEV-Protection for agent-led trades using Jito bundles.
+​Advanced Interface:
+​Build a "Command Center" UI using Next.js 15 and Tailwind CSS.
+​Feature a "Live Agent Thought Stream" (visualizing how the AI makes decisions about Bags tokens).
+​Dashboard for tracking ROI, Royalties, and "Social Multiplier" stats.
+​Mobile-First Dev Ops: * Ensure the entire environment remains compatible with Termux/Android workflows.
+​Optimize the build process for low-latency execution and headless deployment.
+​Technical Constraints:
+​Language: TypeScript (Primary), Rust (for performance-critical Solana scripts).
+​Database: PostgreSQL with Prisma for agent memory and transaction history.
+​Connectivity: Dedicated RPC nodes for Solana Mainnet-Beta.
+​Objective: Create the "Gold Standard" for SocialFi automation. The result should be a production-ready system where an AI agent acts as a 24/7 business manager for any Bags.fm creator."
