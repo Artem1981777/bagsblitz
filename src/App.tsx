@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Rocket, Brain, Trophy, Zap } from "lucide-react"
 import { C, mono } from "./theme"
 import { MOCK_TOKENS, rand, BAGS_API, BAGS_KEY } from "./data"
 import { useAgent } from "./hooks/useAgent"
 import { useTransactionFeed } from "./hooks/useTransactionFeed"
-import type { Token, Page, WalletState } from "./types"
+import { useTradeValidator } from "./hooks/useTradeValidator"
+import type { Token, Page, WalletState, TxEvent } from "./types"
 
 import { TokenFeed } from "./components/TokenFeed"
 import { TokenDetail } from "./components/TokenDetail"
@@ -13,29 +14,34 @@ import { Leaderboard } from "./components/Leaderboard"
 import { AgentCommandCenter } from "./components/AgentCommandCenter"
 
 export default function App() {
-  const [page, setPage] = useState<Page>("feed")
-  const [tokens, setTokens] = useState<Token[]>(MOCK_TOKENS)
-  const [sel, setSel] = useState<Token | null>(null)
-  const [wallet, setWallet] = useState<WalletState>({ connected: false, address: "", balance: 0 })
-  const [filter, setFilter] = useState<"hot" | "new" | "top">("hot")
-  const [notif, setNotif] = useState("")
+  const [page, setPage]       = useState<Page>("feed")
+  const [tokens, setTokens]   = useState<Token[]>(MOCK_TOKENS)
+  const [sel, setSel]         = useState<Token | null>(null)
+  const [wallet, setWallet]   = useState<WalletState>({ connected: false, address: "", balance: 0 })
+  const [filter, setFilter]   = useState<"hot" | "new" | "top">("hot")
+  const [notif, setNotif]     = useState("")
   const [liveTokens, setLiveTokens] = useState<any[]>([])
-  const [analyzing, setAnalyzing] = useState(false)
+  const [analyzing, setAnalyzing]   = useState(false)
   const [aiAnalysis, setAiAnalysis] = useState<{ score: number; verdict: string; report: string } | null>(null)
   const [jitoEnabled, setJitoEnabled] = useState(false)
 
-  const agent = useAgent()
-  const txFeed = useTransactionFeed(tokens, jitoEnabled)
+  const agent    = useAgent()
+  const txFeed   = useTransactionFeed(tokens, jitoEnabled)
+  const validator = useTradeValidator(agent.addThought, jitoEnabled)
 
-  // Wire transaction feed → agent thought stream
+  // Wire: tx feed → agent thoughts + proactive whale validation
+  const handleNewTx = useCallback((tx: TxEvent) => {
+    agent.reactToTx(tx)
+    if (tx.type === "whale_buy") {
+      validator.validateWhale(tx)
+    }
+  }, [agent.reactToTx, validator.validateWhale])
+
   useEffect(() => {
-    txFeed.setOnNewTx(agent.reactToTx)
-  }, [txFeed.setOnNewTx, agent.reactToTx])
+    txFeed.setOnNewTx(handleNewTx)
+  }, [txFeed.setOnNewTx, handleNewTx])
 
-  const toast = (m: string) => {
-    setNotif(m)
-    setTimeout(() => setNotif(""), 3000)
-  }
+  const toast = (m: string) => { setNotif(m); setTimeout(() => setNotif(""), 3200) }
 
   // Live price simulation
   useEffect(() => {
@@ -43,7 +49,7 @@ export default function App() {
     return () => clearInterval(t)
   }, [])
 
-  // Fetch live bags.fm tokens
+  // Fetch bags.fm live tokens
   useEffect(() => {
     async function fetchLive() {
       try {
@@ -66,16 +72,16 @@ export default function App() {
         const res = await phantom.connect()
         setWallet({
           connected: true,
-          address: res.publicKey.toString().slice(0, 4) + "..." + res.publicKey.toString().slice(-4),
+          address: res.publicKey.toString().slice(0, 4) + "…" + res.publicKey.toString().slice(-4),
           balance: +(Math.random() * 5 + 0.5).toFixed(3),
         })
         toast("Phantom connected!")
       } catch {
-        setWallet({ connected: true, address: "Demo...1234", balance: 1.5 })
+        setWallet({ connected: true, address: "Demo…1234", balance: 1.5 })
         toast("Demo mode active")
       }
     } else {
-      setWallet({ connected: true, address: "Demo...1234", balance: 1.5 })
+      setWallet({ connected: true, address: "Demo…1234", balance: 1.5 })
       toast("Install Phantom for full access")
     }
   }
@@ -104,7 +110,7 @@ export default function App() {
     agent.addThought({
       type: "analysis",
       message: `$${token.symbol} analysis complete → ${verdict} (${score}/100)`,
-      detail: report.slice(0, 90) + "...",
+      detail: report.slice(0, 90) + "…",
       confidence: score,
     })
     setAnalyzing(false)
@@ -113,27 +119,19 @@ export default function App() {
   function handleLaunch(form: any) {
     const newToken: Token = {
       id: Date.now().toString(),
-      name: form.name,
-      symbol: form.symbol.toUpperCase(),
-      description: form.desc,
-      image: form.img || "🚀",
-      price: 0.0000001,
-      priceChange: 0,
-      marketCap: 1000,
-      volume: 0,
-      holders: 1,
-      bondingProgress: 0.5,
+      name: form.name, symbol: form.symbol.toUpperCase(),
+      description: form.desc, image: form.img || "🚀",
+      price: 0.0000001, priceChange: 0, marketCap: 1000,
+      volume: 0, holders: 1, bondingProgress: 0.5,
       royaltyPct: parseInt(form.royalty),
-      creator: wallet.address || "Demo...0001",
-      createdAt: Date.now(),
-      priceHistory: [0.0000001],
-      mint: "",
+      creator: wallet.address || "Demo…0001",
+      createdAt: Date.now(), priceHistory: [0.0000001], mint: "",
     }
     setTokens(p => [newToken, ...p])
     agent.addThought({
       type: "action",
       message: `🚀 Token launched: $${form.symbol.toUpperCase()} · ${form.royalty}% royalty`,
-      detail: `${form.name} · Bags.fm bonding curve initialized · Pre-flight checks passed${jitoEnabled ? " · Jito bundle active" : ""}`,
+      detail: `${form.name} · Bags.fm bonding curve initialized · Pre-flight passed${jitoEnabled ? " · Jito bundle active" : ""}`,
       confidence: 98,
     })
     toast(`🚀 ${form.name} launched on Bags.fm!`)
@@ -145,6 +143,12 @@ export default function App() {
     toast(enabled ? "⬡ Jito MEV protection enabled" : "Jito MEV protection disabled")
   }
 
+  // One-click Copy Trade from WhaleFeed
+  const handleCopyTrade = useCallback((tx: TxEvent) => {
+    validator.copyTrade(tx)
+    toast(`📋 Copy Trade: $${tx.tokenSymbol} · Running Security Suite…`)
+  }, [validator.copyTrade])
+
   const nav = [
     { id: "feed",   label: "Discover", icon: <Zap size={15} /> },
     { id: "agent",  label: "Agent",    icon: <Brain size={15} /> },
@@ -152,18 +156,19 @@ export default function App() {
     { id: "board",  label: "Top",      icon: <Trophy size={15} /> },
   ] as const
 
-  // Badge: unread whale count for Agent nav
-  const unreadWhales = txFeed.txEvents.filter(t => t.isWhale && Date.now() - t.timestamp < 20000).length
+  // Nav badges
+  const unreadWhales  = txFeed.txEvents.filter(t => t.isWhale && Date.now() - t.timestamp < 20000).length
+  const queueReady    = validator.tradeQueue.filter(e => e.status === "queued" || e.status === "validating" || e.status === "blocked").length
 
   return (
     <div style={{
       minHeight: "100vh", background: C.bg, color: C.text,
-      fontFamily: "-apple-system, 'SF Pro Display', 'Inter', sans-serif",
+      fontFamily: "-apple-system,'SF Pro Display','Inter',sans-serif",
       paddingBottom: 72, position: "relative", overflow: "hidden",
     }}>
       {/* Background orbs */}
-      <div style={{ position:"fixed", top:"-20%", right:"-10%", width:"40vw", height:"40vw", borderRadius:"50%", background:"radial-gradient(circle, rgba(153,69,255,0.07) 0%, transparent 70%)", pointerEvents:"none", zIndex:0 }} />
-      <div style={{ position:"fixed", bottom:"-10%", left:"-10%", width:"35vw", height:"35vw", borderRadius:"50%", background:"radial-gradient(circle, rgba(20,241,149,0.05) 0%, transparent 70%)", pointerEvents:"none", zIndex:0 }} />
+      <div style={{ position:"fixed", top:"-20%", right:"-10%", width:"40vw", height:"40vw", borderRadius:"50%", background:"radial-gradient(circle,rgba(153,69,255,0.07) 0%,transparent 70%)", pointerEvents:"none", zIndex:0 }} />
+      <div style={{ position:"fixed", bottom:"-10%", left:"-10%", width:"35vw", height:"35vw", borderRadius:"50%", background:"radial-gradient(circle,rgba(20,241,149,0.05) 0%,transparent 70%)", pointerEvents:"none", zIndex:0 }} />
 
       {/* Toast */}
       {notif && (
@@ -237,13 +242,17 @@ export default function App() {
             royalties={agent.royalties}
             tokens={tokens}
             agentCycle={agent.agentCycle}
-            onAction={msg => { agent.addThought({ type:"action", message:msg, confidence:90 }); toast(msg.slice(0,44)) }}
+            onAction={msg => { agent.addThought({ type:"action", message:msg, confidence:90 }); toast(msg.slice(0, 44)) }}
             txEvents={txFeed.txEvents}
             bundles={txFeed.bundles}
             whaleCount={txFeed.whaleCount}
             mevBlockCount={txFeed.mevBlockCount}
             jitoEnabled={jitoEnabled}
             onJitoToggle={handleJitoToggle}
+            tradeQueue={validator.tradeQueue}
+            onExecute={validator.executeEntry}
+            onDismiss={validator.dismissEntry}
+            onCopyTrade={handleCopyTrade}
           />
         )}
       </div>
@@ -270,16 +279,16 @@ export default function App() {
             }}>
               {n.icon}
               {n.label}
-              {/* Whale alert badge on Agent nav button */}
-              {n.id === "agent" && unreadWhales > 0 && page !== "agent" && (
+              {/* Whale alert badge */}
+              {n.id === "agent" && (unreadWhales > 0 || queueReady > 0) && page !== "agent" && (
                 <span style={{
-                  position:"absolute", top:6, right:"calc(50% - 14px)",
-                  background:"#f59e0b", color:"#000",
-                  borderRadius:"50%", width:14, height:14,
+                  position:"absolute", top:6, right:"calc(50% - 16px)",
+                  background: queueReady > 0 ? C.green : "#f59e0b",
+                  color:"#000", borderRadius:"50%", width:14, height:14,
                   fontSize:7, fontWeight:900,
                   display:"flex", alignItems:"center", justifyContent:"center",
                 }}>
-                  {unreadWhales > 9 ? "9+" : unreadWhales}
+                  {(unreadWhales + queueReady) > 9 ? "9+" : unreadWhales + queueReady}
                 </span>
               )}
             </button>

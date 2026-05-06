@@ -3,9 +3,9 @@ import type { AgentThought, YieldPosition, RoyaltyEntry, TxEvent } from "../type
 
 const THOUGHT_TEMPLATES = [
   { type: "scan" as const, messages: [
-    { msg: "Scanning bonding curves across all tracked tokens...", detail: "Monitoring price velocity and volume anomalies" },
+    { msg: "Scanning bonding curves across all tracked tokens…", detail: "Monitoring price velocity and volume anomalies" },
     { msg: "BondingCurve.scan() → detecting graduation candidates", detail: "Graduation threshold: 100% bonding = DEX listing imminent" },
-    { msg: "Analyzing royalty yield opportunities...", detail: "Calculating optimal claim windows across 12 positions" },
+    { msg: "Analyzing royalty yield opportunities…", detail: "Calculating optimal claim windows across 12 positions" },
     { msg: "Cross-referencing social sentiment for $CREATE", detail: "X mentions +89%, Discord activity elevated — bullish signal" },
     { msg: "Monitoring Bags.fm mempool — no anomalies", detail: "All observed transactions within expected volume bands" },
   ]},
@@ -22,7 +22,7 @@ const THOUGHT_TEMPLATES = [
     { msg: "Royalty stream analysis: $12.4 earned this week", detail: "Best performing: $GGLD (4% royalty × high volume)" },
   ]},
   { type: "security" as const, messages: [
-    { msg: "Pre-flight check initiated for pending buy order", detail: "Running 7-point safety validation pipeline..." },
+    { msg: "Pre-flight check initiated for pending buy order", detail: "Running 7-point safety validation pipeline…" },
     { msg: "✅ Contract audit: No honeypot patterns detected", detail: "Source verified against known malicious signatures" },
     { msg: "Slippage guard: 2.5% max applied for $CREATE trade", detail: "Market impact estimated at 0.8%. Safe to proceed." },
     { msg: "Safety buffer check: wallet balance sufficient", detail: "Maintaining 0.1 SOL reserve. Transaction approved." },
@@ -39,7 +39,7 @@ const THOUGHT_TEMPLATES = [
   ]},
 ]
 
-/** Dynamically craft a thought from a live TxEvent */
+/** Craft a dynamic thought from a live TxEvent */
 function thoughtFromTx(tx: TxEvent): Omit<AgentThought, "id" | "timestamp"> {
   const sol = tx.solAmount.toFixed(tx.solAmount >= 10 ? 1 : 3)
   const usd = tx.usdAmount.toFixed(0)
@@ -64,8 +64,8 @@ function thoughtFromTx(tx: TxEvent): Omit<AgentThought, "id" | "timestamp"> {
     return {
       type: "alert",
       message: `🐋 WHALE BUY detected: ${sol} SOL ($${usd}) into $${tx.tokenSymbol}`,
-      detail: `Wallet ${tx.walletAddr} · Bonding curve +${tx.bondingDelta.toFixed(1)}% · Price ${tx.priceDelta >= 0 ? "+" : ""}${tx.priceDelta.toFixed(2)}% · ${tx.jitoStatus === "confirmed" ? "Jito bundled ✓" : "unprotected"}`,
-      confidence: 91,
+      detail: `Wallet ${tx.walletAddr} · Curve +${tx.bondingDelta.toFixed(1)}% · ${tx.jitoStatus === "confirmed" ? "Jito bundled ✓" : "unprotected"} · Triggering Honeypot check…`,
+      confidence: 88,
     }
   }
   if (tx.type === "whale_sell") {
@@ -73,7 +73,7 @@ function thoughtFromTx(tx: TxEvent): Omit<AgentThought, "id" | "timestamp"> {
       type: "alert",
       message: `🐳 WHALE SELL: ${sol} SOL ($${usd}) exiting $${tx.tokenSymbol}`,
       detail: `Wallet ${tx.walletAddr} · Distribution signal. Reassessing position confidence. Watching for follow-on selling.`,
-      confidence: 88,
+      confidence: 85,
     }
   }
   if (tx.type === "new_listing") {
@@ -87,7 +87,7 @@ function thoughtFromTx(tx: TxEvent): Omit<AgentThought, "id" | "timestamp"> {
   return {
     type: "scan",
     message: `◉ Activity on $${tx.tokenSymbol}: ${sol} SOL`,
-    detail: `Normal buy order. Volume within expected range. No action required.`,
+    detail: `Normal buy order. Volume within expected range.`,
     confidence: 60,
   }
 }
@@ -101,20 +101,20 @@ export function useAgent() {
       return stored ? JSON.parse(stored).slice(-50) : []
     } catch { return [] }
   })
-  const [isActive, setIsActive] = useState(true)
+  const [isActive, setIsActive]   = useState(true)
   const [agentCycle, setAgentCycle] = useState(0)
 
   const [yieldPositions] = useState<YieldPosition[]>([
-    { id:"y1", protocol:"Meteora DLMM", tokenA:"SOL", tokenB:"USDC", tvl:1247, apy:47.3, earned:0.062, status:"active" },
-    { id:"y2", protocol:"Kamino Finance", tokenA:"SOL", tokenB:"mSOL", tvl:834, apy:23.8, earned:0.031, status:"active" },
-    { id:"y3", protocol:"Meteora DLMM", tokenA:"USDC", tokenB:"BONK", tvl:412, apy:89.1, earned:0.018, status:"rebalancing" },
+    { id:"y1", protocol:"Meteora DLMM",  tokenA:"SOL",  tokenB:"USDC", tvl:1247, apy:47.3, earned:0.062, status:"active" },
+    { id:"y2", protocol:"Kamino Finance", tokenA:"SOL",  tokenB:"mSOL", tvl:834,  apy:23.8, earned:0.031, status:"active" },
+    { id:"y3", protocol:"Meteora DLMM",  tokenA:"USDC", tokenB:"BONK", tvl:412,  apy:89.1, earned:0.018, status:"rebalancing" },
   ])
 
   const [royalties] = useState<RoyaltyEntry[]>([
-    { tokenSymbol:"GGLD", tokenName:"Gaming Guild",  amount:0.042, usdValue:6.80, claimedAt:Date.now()-3600000,  reinvested:true  },
-    { tokenSymbol:"CREATE", tokenName:"Creator Coin",amount:0.018, usdValue:2.91, claimedAt:Date.now()-7200000,  reinvested:true  },
-    { tokenSymbol:"MUSIC", tokenName:"Music DAO",    amount:0.009, usdValue:1.46, claimedAt:Date.now()-14400000, reinvested:false },
-    { tokenSymbol:"BBLITZ", tokenName:"BagsBlitz",   amount:0.003, usdValue:0.49, claimedAt:Date.now()-28800000, reinvested:true  },
+    { tokenSymbol:"GGLD",   tokenName:"Gaming Guild",  amount:0.042, usdValue:6.80, claimedAt:Date.now()-3600000,  reinvested:true  },
+    { tokenSymbol:"CREATE", tokenName:"Creator Coin",  amount:0.018, usdValue:2.91, claimedAt:Date.now()-7200000,  reinvested:true  },
+    { tokenSymbol:"MUSIC",  tokenName:"Music DAO",     amount:0.009, usdValue:1.46, claimedAt:Date.now()-14400000, reinvested:false },
+    { tokenSymbol:"BBLITZ", tokenName:"BagsBlitz",     amount:0.003, usdValue:0.49, claimedAt:Date.now()-28800000, reinvested:true  },
   ])
 
   const addThought = useCallback((thought: Omit<AgentThought, "id" | "timestamp">) => {
@@ -130,29 +130,27 @@ export function useAgent() {
     })
   }, [])
 
-  /** Called by useTransactionFeed for every significant live tx */
+  /**
+   * Called by useTransactionFeed for every significant tx.
+   * Emits an immediate thought; the caller (App.tsx) also triggers the
+   * trade validator for whale buys.
+   */
   const reactToTx = useCallback((tx: TxEvent) => {
-    // Only react to whales, MEV blocks, graduations, new listings
     if (!tx.isWhale && !tx.mevBlocked && tx.type !== "graduation" && tx.type !== "new_listing") return
     addThought(thoughtFromTx(tx))
     setAgentCycle(c => c + 1)
   }, [addThought])
 
-  // Background pulse — periodic ambient thoughts
+  // Background ambient pulse
   useEffect(() => {
     if (!isActive) return
-    const interval = setInterval(() => {
-      const category = THOUGHT_TEMPLATES[Math.floor(Math.random() * THOUGHT_TEMPLATES.length)]
-      const item = category.messages[Math.floor(Math.random() * category.messages.length)]
-      addThought({
-        type: category.type,
-        message: item.msg,
-        detail: item.detail,
-        confidence: Math.floor(Math.random() * 35) + 60,
-      })
+    const id = setInterval(() => {
+      const cat  = THOUGHT_TEMPLATES[Math.floor(Math.random() * THOUGHT_TEMPLATES.length)]
+      const item = cat.messages[Math.floor(Math.random() * cat.messages.length)]
+      addThought({ type: cat.type, message: item.msg, detail: item.detail, confidence: Math.floor(Math.random() * 35) + 60 })
       setAgentCycle(c => c + 1)
     }, 5000)
-    return () => clearInterval(interval)
+    return () => clearInterval(id)
   }, [isActive, addThought])
 
   return { thoughts, isActive, setIsActive, agentCycle, yieldPositions, royalties, addThought, reactToTx }

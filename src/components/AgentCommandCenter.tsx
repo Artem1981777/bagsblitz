@@ -1,20 +1,22 @@
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { C, glass, mono, pill } from "../theme"
 import { AgentStream } from "./AgentStream"
 import { YieldOptimizer } from "./YieldOptimizer"
 import { SecuritySuite } from "./SecuritySuite"
 import { Dashboard } from "./Dashboard"
 import { WhaleFeed } from "./WhaleFeed"
-import type { AgentThought, YieldPosition, RoyaltyEntry, Token, TxEvent, JitoBundle } from "../types"
+import { TradeQueue } from "./TradeQueue"
+import type { AgentThought, YieldPosition, RoyaltyEntry, Token, TxEvent, JitoBundle, TradeQueueEntry } from "../types"
 
-type CenterTab = "stream" | "whales" | "security" | "yield" | "dashboard"
+type CenterTab = "stream" | "whales" | "queue" | "security" | "yield" | "dashboard"
 
 const TABS: { id: CenterTab; label: string; icon: string; color: string }[] = [
-  { id: "stream",    label: "Stream",    icon: "◉", color: "#14f195" },
-  { id: "whales",    label: "Whales",    icon: "🐋", color: "#f59e0b" },
-  { id: "security",  label: "Security",  icon: "⬡", color: "#9945ff" },
-  { id: "yield",     label: "Yield",     icon: "◈", color: "#10b981" },
-  { id: "dashboard", label: "Stats",     icon: "◆", color: "#ec4899" },
+  { id: "stream",    label: "Stream",   icon: "◉", color: "#14f195" },
+  { id: "whales",    label: "Whales",   icon: "🐋", color: "#f59e0b" },
+  { id: "queue",     label: "Queue",    icon: "◈", color: "#14f195" },
+  { id: "security",  label: "Security", icon: "⬡", color: "#9945ff" },
+  { id: "yield",     label: "Yield",    icon: "◆", color: "#10b981" },
+  { id: "dashboard", label: "Stats",    icon: "▣", color: "#ec4899" },
 ]
 
 export function AgentCommandCenter({
@@ -23,6 +25,7 @@ export function AgentCommandCenter({
   agentCycle, onAction,
   txEvents, bundles, whaleCount, mevBlockCount,
   jitoEnabled, onJitoToggle,
+  tradeQueue, onExecute, onDismiss, onCopyTrade,
 }: {
   thoughts: AgentThought[]
   isActive: boolean
@@ -38,23 +41,36 @@ export function AgentCommandCenter({
   mevBlockCount: number
   jitoEnabled: boolean
   onJitoToggle: (v: boolean) => void
+  tradeQueue: TradeQueueEntry[]
+  onExecute: (id: string) => void
+  onDismiss: (id: string) => void
+  onCopyTrade: (tx: TxEvent) => void
 }) {
   const [tab, setTab] = useState<CenterTab>("stream")
 
-  // Unread whale badge count
-  const newWhales = txEvents.filter(t => t.isWhale && Date.now() - t.timestamp < 15000).length
+  // When Copy Trade is triggered from the Whale Feed, switch to Queue tab
+  const handleCopyTrade = useCallback((tx: TxEvent) => {
+    onCopyTrade(tx)
+    setTab("queue")
+  }, [onCopyTrade])
+
+  // Badges
+  const newWhales     = txEvents.filter(t => t.isWhale && Date.now() - t.timestamp < 15000).length
+  const readyQueue    = tradeQueue.filter(e => e.status === "queued").length
+  const blockedQueue  = tradeQueue.filter(e => e.status === "blocked").length
+  const validatingCnt = tradeQueue.filter(e => e.status === "validating").length
+  const queueBadge    = readyQueue + blockedQueue + validatingCnt
+
+  // Ids of txs already in the queue (for CopyTrade dedup)
+  const copiedIds = new Set(tradeQueue.map(e => e.sourceTx.id))
 
   return (
     <div style={{ padding: 12, position: "relative", zIndex: 1 }}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.5px", marginBottom: 2 }}>
-            Command Center
-          </div>
-          <div style={{ fontSize: 12, color: C.textMuted }}>
-            elizaOS · Autonomous SocialFi Infrastructure
-          </div>
+          <div style={{ fontSize: 21, fontWeight: 800, letterSpacing: "-0.5px", marginBottom: 2 }}>Command Center</div>
+          <div style={{ fontSize: 11, color: C.textMuted }}>elizaOS · Autonomous SocialFi Infrastructure</div>
         </div>
         <div style={{ textAlign: "right" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, justifyContent: "flex-end" }}>
@@ -68,26 +84,24 @@ export function AgentCommandCenter({
               {isActive ? "ACTIVE" : "PAUSED"}
             </span>
           </div>
-          <div style={{ ...mono, fontSize: 9, color: C.textMuted, marginTop: 2 }}>
-            cycle #{agentCycle.toString().padStart(4, "0")}
-          </div>
+          <div style={{ ...mono, fontSize: 9, color: C.textMuted, marginTop: 2 }}>cycle #{agentCycle.toString().padStart(4, "0")}</div>
         </div>
       </div>
 
       {/* Status strip */}
       <div style={{
-        ...glass, padding: "9px 14px", marginBottom: 10,
+        ...glass, padding: "8px 14px", marginBottom: 10,
         background: "linear-gradient(135deg,rgba(20,241,149,0.04),rgba(153,69,255,0.04))",
         border: `1px solid rgba(20,241,149,0.12)`,
-        display: "flex", gap: 0, overflowX: "auto", scrollbarWidth: "none",
+        display: "flex", overflowX: "auto", scrollbarWidth: "none",
       }}>
         {[
-          { label: "Watched",   value: tokens.length.toString(),     color: C.green },
-          { label: "Hot",       value: tokens.filter(t => t.priceChange > 100).length.toString(), color: C.amber },
-          { label: "Whales",    value: whaleCount.toString(),         color: "#f59e0b" },
-          { label: "MEV Off",   value: mevBlockCount.toString(),      color: C.purple },
-          { label: "Jito",      value: jitoEnabled ? "ON" : "OFF",   color: jitoEnabled ? C.purple : C.textDim },
-          { label: "elizaOS",   value: "v0.1.9",                     color: C.textMuted },
+          { label: "Watched",  value: tokens.length.toString(),     color: C.green },
+          { label: "Whales",   value: whaleCount.toString(),         color: "#f59e0b" },
+          { label: "MEV Off",  value: mevBlockCount.toString(),      color: C.purple },
+          { label: "Queued",   value: readyQueue.toString(),         color: C.green },
+          { label: "Blocked",  value: blockedQueue.toString(),       color: "#ff3366" },
+          { label: "Jito",     value: jitoEnabled ? "ON" : "OFF",    color: jitoEnabled ? C.purple : C.textDim },
         ].map((s, i) => (
           <div key={s.label} style={{
             flexShrink: 0, textAlign: "center", flex: 1,
@@ -102,30 +116,33 @@ export function AgentCommandCenter({
 
       {/* Tabs */}
       <div style={{
-        display: "flex", gap: 3, marginBottom: 10,
+        display: "flex", gap: 2, marginBottom: 10,
         background: "rgba(255,255,255,0.03)", borderRadius: 10, padding: 3,
         border: `1px solid rgba(255,255,255,0.06)`,
       }}>
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
-            flex: 1, padding: "6px 2px", borderRadius: 7, border: "none", cursor: "pointer",
+            flex: 1, padding: "5px 1px", borderRadius: 7, border: "none", cursor: "pointer",
             background: tab === t.id ? "rgba(255,255,255,0.07)" : "transparent",
             color: tab === t.id ? t.color : C.textMuted,
-            fontSize: 8, fontWeight: 700, letterSpacing: "0.2px", transition: "all 0.2s",
+            fontSize: 7.5, fontWeight: 700, letterSpacing: "0.1px", transition: "all 0.2s",
             display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
             position: "relative",
           }}>
-            <span style={{ fontSize: 11 }}>{t.icon}</span>
+            <span style={{ fontSize: 10 }}>{t.icon}</span>
             <span>{t.label}</span>
+
             {/* Whale badge */}
             {t.id === "whales" && newWhales > 0 && (
-              <span style={{
-                position: "absolute", top: 2, right: 4,
-                background: "#f59e0b", color: "#000",
-                borderRadius: "50%", width: 13, height: 13,
-                fontSize: 7, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
+              <span style={{ position: "absolute", top: 1, right: 2, background: "#f59e0b", color: "#000", borderRadius: "50%", width: 12, height: 12, fontSize: 7, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {newWhales > 9 ? "9+" : newWhales}
+              </span>
+            )}
+
+            {/* Queue badge */}
+            {t.id === "queue" && queueBadge > 0 && (
+              <span style={{ position: "absolute", top: 1, right: 2, background: blockedQueue > 0 && readyQueue === 0 ? "#ff3366" : C.green, color: "#000", borderRadius: "50%", width: 12, height: 12, fontSize: 7, fontWeight: 900, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                {queueBadge > 9 ? "9+" : queueBadge}
               </span>
             )}
           </button>
@@ -138,12 +155,15 @@ export function AgentCommandCenter({
       )}
       {tab === "whales" && (
         <WhaleFeed
-          txEvents={txEvents}
-          bundles={bundles}
-          whaleCount={whaleCount}
-          mevBlockCount={mevBlockCount}
+          txEvents={txEvents} bundles={bundles}
+          whaleCount={whaleCount} mevBlockCount={mevBlockCount}
           jitoEnabled={jitoEnabled}
+          onCopyTrade={handleCopyTrade}
+          copiedIds={copiedIds}
         />
+      )}
+      {tab === "queue" && (
+        <TradeQueue queue={tradeQueue} onExecute={onExecute} onDismiss={onDismiss} />
       )}
       {tab === "security" && (
         <SecuritySuite

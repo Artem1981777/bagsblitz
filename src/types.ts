@@ -25,6 +25,7 @@ export interface AgentThought {
   detail?: string
   token?: string
   confidence?: number
+  critical?: boolean
 }
 
 export interface YieldPosition {
@@ -77,7 +78,6 @@ export interface TxEvent {
   walletAddr: string
   bondingDelta: number
   priceDelta: number
-  /** Jito MEV-protection pipeline status */
   jitoStatus: "bypassed" | "pending" | "bundling" | "confirmed" | "mev_blocked"
   jitoSlot?: number
   mevBlocked: boolean
@@ -91,4 +91,28 @@ export interface JitoBundle {
   priorityFee: number
   status: "forming" | "submitted" | "confirmed"
   savedFromMev: number
+}
+
+/** Honeypot + Liquidity check result */
+export interface HoneypotResult {
+  symbol: string
+  honeypotDetected: boolean
+  liquidityLocked: boolean
+  rugScore: number               // 0–100 (≥65 = danger)
+  findings: string[]             // list of specific flags
+  recommendation: "SAFE" | "CAUTION" | "CRITICAL"
+}
+
+/** Follow-on trade entry waiting in the queue */
+export type TradeStatus = "validating" | "queued" | "blocked" | "executed" | "dismissed"
+
+export interface TradeQueueEntry {
+  id: string
+  timestamp: number
+  sourceTx: TxEvent              // the whale tx that triggered this
+  suggestedSol: number           // agent-recommended follow-on size
+  honeypot: HoneypotResult | null
+  status: TradeStatus
+  jitoEnabled: boolean
+  triggeredBy: "auto" | "copy"   // auto = proactive; copy = one-click copy trade
 }
