@@ -61,3 +61,34 @@ export interface WalletState {
 }
 
 export type Page = "feed" | "launch" | "token" | "board" | "agent" | "yield"
+
+/** Live on-chain transaction event */
+export type TxType = "whale_buy" | "whale_sell" | "graduation" | "new_listing" | "normal_buy" | "normal_sell" | "rug_alert"
+
+export interface TxEvent {
+  id: string
+  timestamp: number
+  type: TxType
+  tokenSymbol: string
+  tokenName: string
+  tokenImage: string
+  solAmount: number
+  usdAmount: number
+  walletAddr: string
+  bondingDelta: number
+  priceDelta: number
+  /** Jito MEV-protection pipeline status */
+  jitoStatus: "bypassed" | "pending" | "bundling" | "confirmed" | "mev_blocked"
+  jitoSlot?: number
+  mevBlocked: boolean
+  isWhale: boolean
+}
+
+export interface JitoBundle {
+  id: string
+  slot: number
+  txCount: number
+  priorityFee: number
+  status: "forming" | "submitted" | "confirmed"
+  savedFromMev: number
+}

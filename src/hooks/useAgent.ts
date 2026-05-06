@@ -1,37 +1,35 @@
 import { useState, useEffect, useCallback } from "react"
-import type { AgentThought, YieldPosition, RoyaltyEntry } from "../types"
+import type { AgentThought, YieldPosition, RoyaltyEntry, TxEvent } from "../types"
 
 const THOUGHT_TEMPLATES = [
   { type: "scan" as const, messages: [
-    { msg: "Scanning bonding curves across 61 tokens...", detail: "Monitoring price velocity and volume anomalies" },
-    { msg: "Detected momentum spike on $GGLD", detail: "Volume +340% in 10min. Bonding curve at 95%. Breakout imminent." },
-    { msg: "Cross-referencing social sentiment for $CREATE", detail: "Twitter mentions +89%, Discord activity elevated" },
-    { msg: "Analyzing royalty yield opportunities...", detail: "Calculating optimal claim windows for 12 positions" },
-    { msg: "Monitoring Bags.fm mempool for large orders", detail: "No whale movements detected in last 60s" },
-    { msg: "BondingCurve.scan() → 23 tokens near graduation", detail: "Graduation threshold: 100% bonding = DEX listing" },
+    { msg: "Scanning bonding curves across all tracked tokens...", detail: "Monitoring price velocity and volume anomalies" },
+    { msg: "BondingCurve.scan() → detecting graduation candidates", detail: "Graduation threshold: 100% bonding = DEX listing imminent" },
+    { msg: "Analyzing royalty yield opportunities...", detail: "Calculating optimal claim windows across 12 positions" },
+    { msg: "Cross-referencing social sentiment for $CREATE", detail: "X mentions +89%, Discord activity elevated — bullish signal" },
+    { msg: "Monitoring Bags.fm mempool — no anomalies", detail: "All observed transactions within expected volume bands" },
   ]},
   { type: "alert" as const, messages: [
-    { msg: "⚡ ALERT: $LMAO bonding curve +567% in 5min", detail: "Unusual price action detected. Potential coordinated buy." },
     { msg: "⚠️ Low liquidity warning on $PETS", detail: "Spread widening. Reducing position confidence to 42%." },
     { msg: "🔴 Rug-risk flag: New token with unlocked liquidity", detail: "Pre-flight check FAILED. Blocking auto-invest." },
     { msg: "✅ $MUSIC royalty claim ready: +0.042 SOL", detail: "Optimal gas window detected. Executing claim." },
+    { msg: "⚡ Price anomaly detected — running anomaly classifier", detail: "Spike pattern consistent with coordinated entry. Monitoring." },
   ]},
   { type: "yield" as const, messages: [
     { msg: "Depositing 0.5 SOL royalties → Meteora DLMM", detail: "SOL/USDC pool. Current APY: 47.3%. Rebalancing in range." },
-    { msg: "Kamino vault rebalance triggered for SOL/USDC", detail: "Price out of range. Moving liquidity to optimal tick." },
+    { msg: "Kamino vault rebalance triggered for SOL/mSOL", detail: "Price out of range. Moving liquidity to optimal tick." },
     { msg: "Yield harvest: +0.018 SOL from Meteora DLMM", detail: "Auto-compounding into principal. New TVL: $1,247" },
-    { msg: "Royalty stream analysis: $12.4 earned this week", detail: "Best performing: $GGLD (4% royalty, high volume)" },
+    { msg: "Royalty stream analysis: $12.4 earned this week", detail: "Best performing: $GGLD (4% royalty × high volume)" },
   ]},
   { type: "security" as const, messages: [
-    { msg: "Pre-flight check initiated for buy order", detail: "Running 7-point safety validation..." },
+    { msg: "Pre-flight check initiated for pending buy order", detail: "Running 7-point safety validation pipeline..." },
     { msg: "✅ Contract audit: No honeypot patterns detected", detail: "Source verified against known malicious signatures" },
-    { msg: "MEV protection active via Jito bundle", detail: "Bundle submitted. Priority fee: 0.001 SOL. Slot: next" },
-    { msg: "Slippage guard: 2.5% max set for $CREATE trade", detail: "Market impact estimated at 0.8%. Safe to proceed." },
+    { msg: "Slippage guard: 2.5% max applied for $CREATE trade", detail: "Market impact estimated at 0.8%. Safe to proceed." },
     { msg: "Safety buffer check: wallet balance sufficient", detail: "Maintaining 0.1 SOL reserve. Transaction approved." },
   ]},
   { type: "action" as const, messages: [
-    { msg: "Executing buy order: 0.1 SOL → $CREATE", detail: "Via Jito bundle. Expected slippage: 0.8%" },
-    { msg: "Auto-claiming royalties for 3 managed tokens", detail: "Total: 0.067 SOL. Routing to yield optimizer." },
+    { msg: "Executing buy order: 0.1 SOL → $CREATE via Jito bundle", detail: "Priority fee: 0.001 SOL. Expected slippage: 0.8%" },
+    { msg: "Auto-claiming royalties for 3 managed tokens", detail: "Total: 0.067 SOL. Routing to Meteora yield optimizer." },
     { msg: "Portfolio rebalance: reducing $ART exposure 15%", detail: "Sentiment declining. Reallocating to $GGLD." },
   ]},
   { type: "social" as const, messages: [
@@ -40,6 +38,59 @@ const THOUGHT_TEMPLATES = [
     { msg: "Sentiment score: $GGLD → 87/100 bullish", detail: "Key signals: holder growth, volume, community engagement" },
   ]},
 ]
+
+/** Dynamically craft a thought from a live TxEvent */
+function thoughtFromTx(tx: TxEvent): Omit<AgentThought, "id" | "timestamp"> {
+  const sol = tx.solAmount.toFixed(tx.solAmount >= 10 ? 1 : 3)
+  const usd = tx.usdAmount.toFixed(0)
+
+  if (tx.mevBlocked) {
+    return {
+      type: "mev",
+      message: `⚡ MEV attack blocked on $${tx.tokenSymbol} — Jito bundle intervened`,
+      detail: `Front-running bot neutralised. Saved ~$${(tx.usdAmount * 0.015).toFixed(2)} for ${tx.walletAddr}. Bundle submitted.`,
+      confidence: 99,
+    }
+  }
+  if (tx.type === "graduation") {
+    return {
+      type: "alert",
+      message: `🎓 $${tx.tokenSymbol} bonding curve COMPLETE — DEX graduation imminent`,
+      detail: `Token will list on Raydium/Orca. Liquidity migration in progress. Watching for arb opportunities.`,
+      confidence: 97,
+    }
+  }
+  if (tx.type === "whale_buy") {
+    return {
+      type: "alert",
+      message: `🐋 WHALE BUY detected: ${sol} SOL ($${usd}) into $${tx.tokenSymbol}`,
+      detail: `Wallet ${tx.walletAddr} · Bonding curve +${tx.bondingDelta.toFixed(1)}% · Price ${tx.priceDelta >= 0 ? "+" : ""}${tx.priceDelta.toFixed(2)}% · ${tx.jitoStatus === "confirmed" ? "Jito bundled ✓" : "unprotected"}`,
+      confidence: 91,
+    }
+  }
+  if (tx.type === "whale_sell") {
+    return {
+      type: "alert",
+      message: `🐳 WHALE SELL: ${sol} SOL ($${usd}) exiting $${tx.tokenSymbol}`,
+      detail: `Wallet ${tx.walletAddr} · Distribution signal. Reassessing position confidence. Watching for follow-on selling.`,
+      confidence: 88,
+    }
+  }
+  if (tx.type === "new_listing") {
+    return {
+      type: "scan",
+      message: `🚀 New token detected: $${tx.tokenSymbol}`,
+      detail: `Running pre-flight checks. Analyzing creator wallet, liquidity lock, and initial buy pattern.`,
+      confidence: 72,
+    }
+  }
+  return {
+    type: "scan",
+    message: `◉ Activity on $${tx.tokenSymbol}: ${sol} SOL`,
+    detail: `Normal buy order. Volume within expected range. No action required.`,
+    confidence: 60,
+  }
+}
 
 const AGENT_THOUGHTS_KEY = "bb_agent_thoughts"
 
@@ -60,10 +111,10 @@ export function useAgent() {
   ])
 
   const [royalties] = useState<RoyaltyEntry[]>([
-    { tokenSymbol:"GGLD", tokenName:"Gaming Guild", amount:0.042, usdValue:6.80, claimedAt:Date.now()-3600000, reinvested:true },
-    { tokenSymbol:"CREATE", tokenName:"Creator Coin", amount:0.018, usdValue:2.91, claimedAt:Date.now()-7200000, reinvested:true },
-    { tokenSymbol:"MUSIC", tokenName:"Music DAO", amount:0.009, usdValue:1.46, claimedAt:Date.now()-14400000, reinvested:false },
-    { tokenSymbol:"BBLITZ", tokenName:"BagsBlitz", amount:0.003, usdValue:0.49, claimedAt:Date.now()-28800000, reinvested:true },
+    { tokenSymbol:"GGLD", tokenName:"Gaming Guild",  amount:0.042, usdValue:6.80, claimedAt:Date.now()-3600000,  reinvested:true  },
+    { tokenSymbol:"CREATE", tokenName:"Creator Coin",amount:0.018, usdValue:2.91, claimedAt:Date.now()-7200000,  reinvested:true  },
+    { tokenSymbol:"MUSIC", tokenName:"Music DAO",    amount:0.009, usdValue:1.46, claimedAt:Date.now()-14400000, reinvested:false },
+    { tokenSymbol:"BBLITZ", tokenName:"BagsBlitz",   amount:0.003, usdValue:0.49, claimedAt:Date.now()-28800000, reinvested:true  },
   ])
 
   const addThought = useCallback((thought: Omit<AgentThought, "id" | "timestamp">) => {
@@ -73,12 +124,21 @@ export function useAgent() {
       timestamp: Date.now(),
     }
     setThoughts(prev => {
-      const next = [t, ...prev].slice(0, 60)
+      const next = [t, ...prev].slice(0, 80)
       try { localStorage.setItem(AGENT_THOUGHTS_KEY, JSON.stringify(next)) } catch {}
       return next
     })
   }, [])
 
+  /** Called by useTransactionFeed for every significant live tx */
+  const reactToTx = useCallback((tx: TxEvent) => {
+    // Only react to whales, MEV blocks, graduations, new listings
+    if (!tx.isWhale && !tx.mevBlocked && tx.type !== "graduation" && tx.type !== "new_listing") return
+    addThought(thoughtFromTx(tx))
+    setAgentCycle(c => c + 1)
+  }, [addThought])
+
+  // Background pulse — periodic ambient thoughts
   useEffect(() => {
     if (!isActive) return
     const interval = setInterval(() => {
@@ -88,12 +148,12 @@ export function useAgent() {
         type: category.type,
         message: item.msg,
         detail: item.detail,
-        confidence: Math.floor(Math.random() * 40) + 60,
+        confidence: Math.floor(Math.random() * 35) + 60,
       })
       setAgentCycle(c => c + 1)
-    }, 3500)
+    }, 5000)
     return () => clearInterval(interval)
   }, [isActive, addThought])
 
-  return { thoughts, isActive, setIsActive, agentCycle, yieldPositions, royalties, addThought }
+  return { thoughts, isActive, setIsActive, agentCycle, yieldPositions, royalties, addThought, reactToTx }
 }

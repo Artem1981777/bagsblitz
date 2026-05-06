@@ -3,6 +3,7 @@ import { Rocket, Brain, Trophy, Zap } from "lucide-react"
 import { C, mono } from "./theme"
 import { MOCK_TOKENS, rand, BAGS_API, BAGS_KEY } from "./data"
 import { useAgent } from "./hooks/useAgent"
+import { useTransactionFeed } from "./hooks/useTransactionFeed"
 import type { Token, Page, WalletState } from "./types"
 
 import { TokenFeed } from "./components/TokenFeed"
@@ -21,21 +22,28 @@ export default function App() {
   const [liveTokens, setLiveTokens] = useState<any[]>([])
   const [analyzing, setAnalyzing] = useState(false)
   const [aiAnalysis, setAiAnalysis] = useState<{ score: number; verdict: string; report: string } | null>(null)
+  const [jitoEnabled, setJitoEnabled] = useState(false)
 
   const agent = useAgent()
+  const txFeed = useTransactionFeed(tokens, jitoEnabled)
+
+  // Wire transaction feed → agent thought stream
+  useEffect(() => {
+    txFeed.setOnNewTx(agent.reactToTx)
+  }, [txFeed.setOnNewTx, agent.reactToTx])
 
   const toast = (m: string) => {
     setNotif(m)
     setTimeout(() => setNotif(""), 3000)
   }
 
-  // Simulate live price updates
+  // Live price simulation
   useEffect(() => {
     const t = setInterval(() => setTokens(p => p.map(rand)), 800)
     return () => clearInterval(t)
   }, [])
 
-  // Fetch live tokens from bags.fm
+  // Fetch live bags.fm tokens
   useEffect(() => {
     async function fetchLive() {
       try {
@@ -77,8 +85,8 @@ export default function App() {
     setAiAnalysis(null)
     agent.addThought({
       type: "analysis",
-      message: `Analyzing $${token.symbol}...`,
-      detail: `Running elizaOS due-diligence pipeline on ${token.name}`,
+      message: `Analyzing $${token.symbol} — running elizaOS due-diligence pipeline`,
+      detail: `Evaluating bonding curve momentum, holder growth, royalty structure, and social signals`,
       confidence: 72,
     })
     await new Promise(r => setTimeout(r, 1600))
@@ -86,16 +94,17 @@ export default function App() {
       Math.floor(token.bondingProgress * 0.6 + token.holders * 0.01 + token.royaltyPct * 2)
     ))
     const verdict = score > 75 ? "INVEST" : score > 55 ? "WATCH" : "AVOID"
-    const report = score > 75
-      ? `Strong project. ${token.name} shows clear creator vision with ${token.royaltyPct}% fair royalty. Bonding curve at ${token.bondingProgress.toFixed(0)}% indicates strong momentum. ${token.holders} holders shows organic community growth.`
-      : score > 55
-      ? `Moderate potential. ${token.name} has interesting concept but needs more traction. Monitor before investing. Current ${token.bondingProgress.toFixed(0)}% bonding progress is developing.`
-      : `High risk. ${token.name} lacks sufficient community validation. Only ${token.holders} holders. Wait for more development.`
+    const report =
+      score > 75
+        ? `Strong project. ${token.name} shows clear creator vision with ${token.royaltyPct}% fair royalty. Bonding curve at ${token.bondingProgress.toFixed(0)}% indicates strong momentum. ${token.holders} holders shows organic community growth.`
+        : score > 55
+        ? `Moderate potential. ${token.name} has interesting concept but needs more traction. Monitor before investing. Current ${token.bondingProgress.toFixed(0)}% bonding progress is developing.`
+        : `High risk. ${token.name} lacks sufficient community validation. Only ${token.holders} holders. Wait for more development.`
     setAiAnalysis({ score, verdict, report })
     agent.addThought({
       type: "analysis",
       message: `$${token.symbol} analysis complete → ${verdict} (${score}/100)`,
-      detail: report.slice(0, 80) + "...",
+      detail: report.slice(0, 90) + "...",
       confidence: score,
     })
     setAnalyzing(false)
@@ -123,44 +132,48 @@ export default function App() {
     setTokens(p => [newToken, ...p])
     agent.addThought({
       type: "action",
-      message: `🚀 New token launched: $${form.symbol.toUpperCase()}`,
-      detail: `${form.name} · ${form.royalty}% royalty · Bags.fm bonding curve initialized`,
+      message: `🚀 Token launched: $${form.symbol.toUpperCase()} · ${form.royalty}% royalty`,
+      detail: `${form.name} · Bags.fm bonding curve initialized · Pre-flight checks passed${jitoEnabled ? " · Jito bundle active" : ""}`,
       confidence: 98,
     })
     toast(`🚀 ${form.name} launched on Bags.fm!`)
     setPage("feed")
   }
 
+  function handleJitoToggle(enabled: boolean) {
+    setJitoEnabled(enabled)
+    toast(enabled ? "⬡ Jito MEV protection enabled" : "Jito MEV protection disabled")
+  }
+
   const nav = [
-    { id: "feed",   label: "Discover", icon: <Zap size={16} /> },
-    { id: "agent",  label: "Agent",    icon: <Brain size={16} /> },
-    { id: "launch", label: "Launch",   icon: <Rocket size={16} /> },
-    { id: "board",  label: "Top",      icon: <Trophy size={16} /> },
+    { id: "feed",   label: "Discover", icon: <Zap size={15} /> },
+    { id: "agent",  label: "Agent",    icon: <Brain size={15} /> },
+    { id: "launch", label: "Launch",   icon: <Rocket size={15} /> },
+    { id: "board",  label: "Top",      icon: <Trophy size={15} /> },
   ] as const
+
+  // Badge: unread whale count for Agent nav
+  const unreadWhales = txFeed.txEvents.filter(t => t.isWhale && Date.now() - t.timestamp < 20000).length
 
   return (
     <div style={{
-      minHeight: "100vh",
-      background: C.bg,
-      color: C.text,
+      minHeight: "100vh", background: C.bg, color: C.text,
       fontFamily: "-apple-system, 'SF Pro Display', 'Inter', sans-serif",
-      paddingBottom: 72,
-      position: "relative",
-      overflow: "hidden",
+      paddingBottom: 72, position: "relative", overflow: "hidden",
     }}>
       {/* Background orbs */}
-      <div style={{ position: "fixed", top: "-20%", right: "-10%", width: "40vw", height: "40vw", borderRadius: "50%", background: "radial-gradient(circle, rgba(153,69,255,0.07) 0%, transparent 70%)", pointerEvents: "none", zIndex: 0 }} />
-      <div style={{ position: "fixed", bottom: "-10%", left: "-10%", width: "35vw", height: "35vw", borderRadius: "50%", background: "radial-gradient(circle, rgba(20,241,149,0.05) 0%, transparent 70%)", pointerEvents: "none", zIndex: 0 }} />
+      <div style={{ position:"fixed", top:"-20%", right:"-10%", width:"40vw", height:"40vw", borderRadius:"50%", background:"radial-gradient(circle, rgba(153,69,255,0.07) 0%, transparent 70%)", pointerEvents:"none", zIndex:0 }} />
+      <div style={{ position:"fixed", bottom:"-10%", left:"-10%", width:"35vw", height:"35vw", borderRadius:"50%", background:"radial-gradient(circle, rgba(20,241,149,0.05) 0%, transparent 70%)", pointerEvents:"none", zIndex:0 }} />
 
       {/* Toast */}
       {notif && (
         <div style={{
-          position: "fixed", top: 64, left: "50%", transform: "translateX(-50%)",
-          background: "rgba(5,5,8,0.97)", border: `1px solid rgba(255,255,255,0.12)`,
-          borderRadius: 10, padding: "9px 18px", zIndex: 300, color: C.text,
-          fontWeight: 600, fontSize: 12, whiteSpace: "nowrap",
-          backdropFilter: "blur(20px)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
-          animation: "slideIn 0.2s ease",
+          position:"fixed", top:60, left:"50%", transform:"translateX(-50%)",
+          background:"rgba(5,5,8,0.97)", border:`1px solid rgba(255,255,255,0.12)`,
+          borderRadius:10, padding:"9px 18px", zIndex:300, color:C.text,
+          fontWeight:600, fontSize:12, whiteSpace:"nowrap",
+          backdropFilter:"blur(20px)", boxShadow:"0 8px 32px rgba(0,0,0,0.5)",
+          animation:"slideIn 0.2s ease",
         }}>
           {notif}
         </div>
@@ -168,93 +181,53 @@ export default function App() {
 
       {/* Header */}
       <div style={{
-        background: "rgba(5,5,8,0.85)", backdropFilter: "blur(20px)",
-        borderBottom: `1px solid rgba(255,255,255,0.07)`,
-        padding: "0 14px", height: 52,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        position: "sticky", top: 0, zIndex: 100,
+        background:"rgba(5,5,8,0.88)", backdropFilter:"blur(20px)",
+        borderBottom:`1px solid rgba(255,255,255,0.07)`,
+        padding:"0 14px", height:52,
+        display:"flex", alignItems:"center", justifyContent:"space-between",
+        position:"sticky", top:0, zIndex:100,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{
-            width: 26, height: 26, borderRadius: 7,
-            background: "linear-gradient(135deg,#9945ff,#14f195)",
-            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13,
-          }}>👜</div>
-          <span style={{ fontWeight: 800, fontSize: 15, letterSpacing: "-0.5px" }}>
-            Bags<span style={{ color: "#9945ff" }}>Blitz</span>
+        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+          <div style={{ width:26, height:26, borderRadius:7, background:"linear-gradient(135deg,#9945ff,#14f195)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13 }}>👜</div>
+          <span style={{ fontWeight:800, fontSize:15, letterSpacing:"-0.5px" }}>
+            Bags<span style={{ color:"#9945ff" }}>Blitz</span>
           </span>
-          <span style={{
-            background: "rgba(20,241,149,0.12)", border: `1px solid rgba(20,241,149,0.25)`,
-            borderRadius: 5, padding: "2px 6px", fontSize: 8, fontWeight: 700, color: "#14f195", letterSpacing: "0.5px",
-          }}>LIVE</span>
-          {agent.isActive && (
-            <span style={{
-              background: "rgba(153,69,255,0.12)", border: `1px solid rgba(153,69,255,0.25)`,
-              borderRadius: 5, padding: "2px 6px", fontSize: 8, fontWeight: 700, color: "#9945ff", letterSpacing: "0.3px",
-            }}>elizaOS</span>
+          <span style={{ background:"rgba(20,241,149,0.12)", border:`1px solid rgba(20,241,149,0.25)`, borderRadius:5, padding:"2px 6px", fontSize:8, fontWeight:700, color:"#14f195", letterSpacing:"0.5px" }}>LIVE</span>
+          {jitoEnabled && (
+            <span style={{ background:"rgba(153,69,255,0.15)", border:`1px solid rgba(153,69,255,0.3)`, borderRadius:5, padding:"2px 6px", fontSize:8, fontWeight:700, color:"#9945ff", letterSpacing:"0.3px" }}>⬡ Jito</span>
           )}
         </div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <div style={{ display:"flex", gap:6, alignItems:"center" }}>
           {wallet.connected && (
-            <span style={{
-              background: "rgba(153,69,255,0.12)", border: `1px solid rgba(153,69,255,0.2)`,
-              borderRadius: 6, padding: "3px 8px", fontSize: 9, fontWeight: 600, color: "#9945ff", ...mono,
-            }}>
+            <span style={{ background:"rgba(153,69,255,0.12)", border:`1px solid rgba(153,69,255,0.2)`, borderRadius:6, padding:"3px 8px", fontSize:9, fontWeight:600, color:"#9945ff", ...mono }}>
               {wallet.balance} SOL
             </span>
           )}
-          <button onClick={connectWallet} style={{
-            background: "rgba(255,255,255,0.05)", border: `1px solid rgba(255,255,255,0.1)`,
-            borderRadius: 8, color: C.text, padding: "5px 10px", cursor: "pointer", fontSize: 10, fontWeight: 600,
-            transition: "all 0.2s",
-          }}>
-            {wallet.connected
-              ? <span style={mono}>{wallet.address}</span>
-              : "Connect Wallet"}
+          <button onClick={connectWallet} style={{ background:"rgba(255,255,255,0.05)", border:`1px solid rgba(255,255,255,0.1)`, borderRadius:8, color:C.text, padding:"5px 10px", cursor:"pointer", fontSize:10, fontWeight:600, transition:"all 0.2s" }}>
+            {wallet.connected ? <span style={mono}>{wallet.address}</span> : "Connect Wallet"}
           </button>
         </div>
       </div>
 
       {/* Pages */}
-      <div style={{ position: "relative", zIndex: 1 }}>
+      <div style={{ position:"relative", zIndex:1 }}>
         {page === "feed" && (
-          <TokenFeed
-            tokens={tokens}
-            liveTokens={liveTokens}
-            filter={filter}
-            onFilter={setFilter}
-            onSelect={t => { setSel(t); setAiAnalysis(null); setPage("token") }}
-          />
+          <TokenFeed tokens={tokens} liveTokens={liveTokens} filter={filter} onFilter={setFilter}
+            onSelect={t => { setSel(t); setAiAnalysis(null); setPage("token") }} />
         )}
-
         {page === "token" && sel && (
-          <TokenDetail
-            token={sel}
-            aiAnalysis={aiAnalysis}
-            analyzing={analyzing}
+          <TokenDetail token={sel} aiAnalysis={aiAnalysis} analyzing={analyzing}
             onBack={() => setPage("feed")}
             onAnalyze={() => analyzeCreator(sel)}
             onBuy={() => toast(`Redirecting to Bags.fm for $${sel.symbol}`)}
-            onShare={() => { navigator.clipboard.writeText(window.location.href); toast("Link copied!") }}
-          />
+            onShare={() => { navigator.clipboard.writeText(window.location.href); toast("Link copied!") }} />
         )}
-
         {page === "launch" && (
-          <LaunchPad
-            wallet={wallet}
-            onLaunch={handleLaunch}
-            onConnect={connectWallet}
-            onToast={toast}
-          />
+          <LaunchPad wallet={wallet} onLaunch={handleLaunch} onConnect={connectWallet} onToast={toast} />
         )}
-
         {page === "board" && (
-          <Leaderboard
-            tokens={tokens}
-            onSelect={t => { setSel(t); setAiAnalysis(null); setPage("token") }}
-          />
+          <Leaderboard tokens={tokens} onSelect={t => { setSel(t); setAiAnalysis(null); setPage("token") }} />
         )}
-
         {page === "agent" && (
           <AgentCommandCenter
             thoughts={agent.thoughts}
@@ -264,33 +237,51 @@ export default function App() {
             royalties={agent.royalties}
             tokens={tokens}
             agentCycle={agent.agentCycle}
-            onAction={msg => { agent.addThought({ type: "action", message: msg, confidence: 90 }); toast(msg.slice(0, 40)) }}
+            onAction={msg => { agent.addThought({ type:"action", message:msg, confidence:90 }); toast(msg.slice(0,44)) }}
+            txEvents={txFeed.txEvents}
+            bundles={txFeed.bundles}
+            whaleCount={txFeed.whaleCount}
+            mevBlockCount={txFeed.mevBlockCount}
+            jitoEnabled={jitoEnabled}
+            onJitoToggle={handleJitoToggle}
           />
         )}
       </div>
 
-      {/* Bottom navigation */}
+      {/* Bottom nav */}
       <div style={{
-        position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
-        width: "100%", maxWidth: 480,
-        background: "rgba(5,5,8,0.92)", backdropFilter: "blur(20px)",
-        borderTop: `1px solid rgba(255,255,255,0.07)`,
-        display: "flex", height: 60, zIndex: 200,
+        position:"fixed", bottom:0, left:"50%", transform:"translateX(-50%)",
+        width:"100%", maxWidth:480,
+        background:"rgba(5,5,8,0.93)", backdropFilter:"blur(20px)",
+        borderTop:`1px solid rgba(255,255,255,0.07)`,
+        display:"flex", height:60, zIndex:200,
       }}>
         {nav.map(n => {
           const active = page === n.id || (page === "token" && n.id === "feed")
           return (
             <button key={n.id} onClick={() => setPage(n.id as Page)} style={{
-              flex: 1, background: active ? "rgba(153,69,255,0.1)" : "none",
-              border: "none", color: active ? "#9945ff" : C.textMuted,
-              cursor: "pointer", display: "flex", flexDirection: "column",
-              alignItems: "center", justifyContent: "center", gap: 3,
-              fontSize: 9, fontWeight: active ? 700 : 400, transition: "all 0.2s",
-              letterSpacing: "0.5px",
+              flex:1, background: active ? "rgba(153,69,255,0.1)" : "none",
+              border:"none", color: active ? "#9945ff" : C.textMuted,
+              cursor:"pointer", display:"flex", flexDirection:"column",
+              alignItems:"center", justifyContent:"center", gap:2,
+              fontSize:9, fontWeight: active ? 700 : 400, transition:"all 0.2s",
+              letterSpacing:"0.5px", position:"relative",
               borderTop: active ? `2px solid #9945ff` : "2px solid transparent",
             }}>
               {n.icon}
               {n.label}
+              {/* Whale alert badge on Agent nav button */}
+              {n.id === "agent" && unreadWhales > 0 && page !== "agent" && (
+                <span style={{
+                  position:"absolute", top:6, right:"calc(50% - 14px)",
+                  background:"#f59e0b", color:"#000",
+                  borderRadius:"50%", width:14, height:14,
+                  fontSize:7, fontWeight:900,
+                  display:"flex", alignItems:"center", justifyContent:"center",
+                }}>
+                  {unreadWhales > 9 ? "9+" : unreadWhales}
+                </span>
+              )}
             </button>
           )
         })}
