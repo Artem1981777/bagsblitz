@@ -33,7 +33,6 @@ export function Dashboard({ tokens, royalties, positions }: {
   const totalRoyaltyUSD = royalties.reduce((s, r) => s + r.usdValue, 0)
   const totalYieldEarned = positions.reduce((s, p) => s + p.earned, 0)
   const totalTVL = positions.reduce((s, p) => s + p.tvl, 0)
-  const topToken = [...tokens].sort((a, b) => b.priceChange - a.priceChange)[0]
   const avgSocialMult = (tokens.reduce((s, t) => s + t.bondingProgress, 0) / tokens.length / 10).toFixed(1)
 
   const weeklyPnL = totalRoyaltyUSD + totalYieldEarned * 160

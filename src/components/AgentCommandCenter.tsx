@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react"
-import { C, glass, mono, pill } from "../theme"
+import { C, glass, mono } from "../theme"
 import { AgentStream } from "./AgentStream"
 import { YieldOptimizer } from "./YieldOptimizer"
 import { SecuritySuite } from "./SecuritySuite"

@@ -24,7 +24,6 @@ function makeTxId() {
 function classifyTx(
   volDelta: number,
   priceDelta: number,
-  bondingDelta: number,
   isNew: boolean,
   bondingPct: number,
 ): TxType {
@@ -95,7 +94,7 @@ function diffApiSnapshot(
     const priceDelta = price - p.price
     const bondingDelta = bonding - p.bondingProgress
     if (Math.abs(volDelta) < 10) continue          // ignore noise
-    const type = classifyTx(Math.abs(volDelta), priceDelta, bondingDelta, false, bonding)
+    const type = classifyTx(Math.abs(volDelta), priceDelta, false, bonding)
     const sol = Math.abs(volDelta) / SOL_USD
     const isWhale = sol >= WHALE_SOL_THRESHOLD
     const mevBlocked = jitoEnabled && isWhale && Math.random() < 0.3

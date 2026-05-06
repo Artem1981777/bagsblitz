@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react"
-import type { TxEvent, HoneypotResult, TradeQueueEntry, TradeStatus, AgentThought } from "../types"
+import type { TxEvent, HoneypotResult, TradeQueueEntry, AgentThought } from "../types"
 
 // ─── Deterministic rug-score engine ──────────────────────────────────────────
 // Same token symbol always produces the same score in a session,

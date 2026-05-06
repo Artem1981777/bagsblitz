@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react"
 import { C, glass, mono, pill, btnPrimary } from "../theme"
-import type { SecurityCheck, TxEvent, JitoBundle } from "../types"
+import type { TxEvent, JitoBundle } from "../types"
 
-const CHECKS_TEMPLATE: Omit<SecurityCheck, "status">[] = [
+interface CheckTemplate { id: string; name: string; detail: string }
+
+const CHECKS_TEMPLATE: CheckTemplate[] = [
   { id: "c1", name: "Honeypot Detection",   detail: "Contract source verified, no malicious selfdestruct patterns" },
   { id: "c2", name: "Liquidity Lock",       detail: "LP tokens locked for minimum 30 days" },
   { id: "c3", name: "Rug-Pull Analysis",    detail: "Owner wallet holds < 20% of supply" },
@@ -130,8 +132,8 @@ export function SecuritySuite({
   recentTxs: TxEvent[]
   bundles: JitoBundle[]
 }) {
-  const [checks, setChecks] = useState<(SecurityCheck & { status: CheckStatus })[]>(
-    CHECKS_TEMPLATE.map(c => ({ ...c, status: "idle" }))
+  const [checks, setChecks] = useState<(CheckTemplate & { status: CheckStatus })[]>(
+    CHECKS_TEMPLATE.map(c => ({ ...c, status: "idle" as CheckStatus }))
   )
   const [running, setRunning] = useState(false)
   const [done, setDone] = useState(false)

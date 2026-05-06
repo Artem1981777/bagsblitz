@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { C, glass, mono, pill, btnPrimary, btnGhost } from "../theme"
+import { C, glass, mono, pill, btnPrimary } from "../theme"
 import type { YieldPosition, RoyaltyEntry } from "../types"
 
 const fmt = (n: number) => n >= 1000 ? (n / 1000).toFixed(1) + "K" : n.toFixed(0)
