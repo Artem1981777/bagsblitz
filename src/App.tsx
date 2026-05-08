@@ -1,10 +1,13 @@
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { Rocket, Brain, Trophy, Zap } from "lucide-react"
 import { C, mono } from "./theme"
-import { MOCK_TOKENS, rand, BAGS_API, BAGS_KEY } from "./data"
+import { MOCK_TOKENS, rand, BAGS_KEY } from "./data"
 import { useAgent } from "./hooks/useAgent"
 import { useTransactionFeed } from "./hooks/useTransactionFeed"
 import { useTradeValidator } from "./hooks/useTradeValidator"
+import { useNow } from "./hooks/useNow"
+import { useQuery } from "@tanstack/react-query"
+import { fetchLiveTokens } from "./lib/bagsApi"
 import type { Token, Page, WalletState, TxEvent } from "./types"
 
 import { TokenFeed } from "./components/TokenFeed"
@@ -20,13 +23,13 @@ export default function App() {
   const [wallet, setWallet]   = useState<WalletState>({ connected: false, address: "", balance: 0 })
   const [filter, setFilter]   = useState<"hot" | "new" | "top">("hot")
   const [notif, setNotif]     = useState("")
-  const [liveTokens, setLiveTokens] = useState<any[]>([])
   const [analyzing, setAnalyzing]   = useState(false)
   const [aiAnalysis, setAiAnalysis] = useState<{ score: number; verdict: string; report: string } | null>(null)
   const [jitoEnabled, setJitoEnabled] = useState(false)
 
-  const agent    = useAgent()
-  const txFeed   = useTransactionFeed(tokens, jitoEnabled)
+  const now = useNow(1000)
+  const agent = useAgent()
+  const txFeed = useTransactionFeed(tokens, jitoEnabled)
   const validator = useTradeValidator(agent.addThought, jitoEnabled)
 
   // Wire: tx feed → agent thoughts + proactive whale validation
@@ -35,13 +38,22 @@ export default function App() {
     if (tx.type === "whale_buy") {
       validator.validateWhale(tx)
     }
-  }, [agent.reactToTx, validator.validateWhale])
+  }, [agent, validator])
 
   useEffect(() => {
     txFeed.setOnNewTx(handleNewTx)
-  }, [txFeed.setOnNewTx, handleNewTx])
+  }, [txFeed, handleNewTx])
 
-  const toast = (m: string) => { setNotif(m); setTimeout(() => setNotif(""), 3200) }
+  const toastT = useRef<number | null>(null)
+  const toast = (m: string) => {
+    setNotif(m)
+    if (toastT.current != null) window.clearTimeout(toastT.current)
+    toastT.current = window.setTimeout(() => setNotif(""), 3200)
+  }
+
+  useEffect(() => {
+    return () => { if (toastT.current != null) window.clearTimeout(toastT.current) }
+  }, [])
 
   // Live price simulation
   useEffect(() => {
@@ -49,31 +61,34 @@ export default function App() {
     return () => clearInterval(t)
   }, [])
 
-  // Fetch bags.fm live tokens
-  useEffect(() => {
-    async function fetchLive() {
-      try {
-        const res = await fetch(BAGS_API + "/tokens?limit=10&sort=volume", {
-          headers: { "x-api-key": BAGS_KEY },
-        })
-        const data = await res.json()
-        if (data.data || data.tokens) setLiveTokens(data.data || data.tokens || [])
-      } catch {}
-    }
-    fetchLive()
-    const i = setInterval(fetchLive, 30000)
-    return () => clearInterval(i)
-  }, [])
+  const liveTokensQ = useQuery({
+    queryKey: ["bags", "tokens", "volume"],
+    queryFn: fetchLiveTokens,
+    enabled: true,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+    retry: 1,
+  })
 
   async function connectWallet() {
-    const phantom = (window as any).solana
+    const phantom = (window as unknown as { solana?: { isPhantom?: boolean; connect: () => Promise<{ publicKey: { toString: () => string } }> } }).solana
     if (phantom?.isPhantom) {
       try {
         const res = await phantom.connect()
+        const pubkeyStr = res.publicKey.toString()
+        let bal = +(Math.random() * 0.5 + 0.05).toFixed(3)
+        try {
+          const { Connection, LAMPORTS_PER_SOL, PublicKey } = await import("@solana/web3.js")
+          const conn = new Connection("https://api.mainnet-beta.solana.com", "confirmed")
+          const lamports = await conn.getBalance(new PublicKey(pubkeyStr))
+          bal = +(lamports / LAMPORTS_PER_SOL).toFixed(3)
+        } catch (err) {
+          void err
+        }
         setWallet({
           connected: true,
-          address: res.publicKey.toString().slice(0, 4) + "…" + res.publicKey.toString().slice(-4),
-          balance: +(Math.random() * 5 + 0.5).toFixed(3),
+          address: pubkeyStr.slice(0, 4) + "…" + pubkeyStr.slice(-4),
+          balance: bal,
         })
         toast("Phantom connected!")
       } catch {
@@ -116,7 +131,7 @@ export default function App() {
     setAnalyzing(false)
   }
 
-  function handleLaunch(form: any) {
+  function handleLaunch(form: { name: string; symbol: string; desc: string; img?: string; royalty: string }) {
     const newToken: Token = {
       id: Date.now().toString(),
       name: form.name, symbol: form.symbol.toUpperCase(),
@@ -147,7 +162,7 @@ export default function App() {
   const handleCopyTrade = useCallback((tx: TxEvent) => {
     validator.copyTrade(tx)
     toast(`📋 Copy Trade: $${tx.tokenSymbol} · Running Security Suite…`)
-  }, [validator.copyTrade])
+  }, [validator])
 
   const nav = [
     { id: "feed",   label: "Discover", icon: <Zap size={15} /> },
@@ -157,7 +172,7 @@ export default function App() {
   ] as const
 
   // Nav badges
-  const unreadWhales  = txFeed.txEvents.filter(t => t.isWhale && Date.now() - t.timestamp < 20000).length
+  const unreadWhales  = txFeed.txEvents.filter(t => t.isWhale && now - t.timestamp < 20000).length
   const queueReady    = validator.tradeQueue.filter(e => e.status === "queued" || e.status === "validating" || e.status === "blocked").length
 
   return (
@@ -198,6 +213,16 @@ export default function App() {
             Bags<span style={{ color:"#9945ff" }}>Blitz</span>
           </span>
           <span style={{ background:"rgba(20,241,149,0.12)", border:`1px solid rgba(20,241,149,0.25)`, borderRadius:5, padding:"2px 6px", fontSize:8, fontWeight:700, color:"#14f195", letterSpacing:"0.5px" }}>LIVE</span>
+          {!BAGS_KEY && (
+            <span style={{ background:"rgba(245,158,11,0.12)", border:`1px solid rgba(245,158,11,0.25)`, borderRadius:5, padding:"2px 6px", fontSize:8, fontWeight:700, color:"#f59e0b", letterSpacing:"0.3px" }}>
+              BAGS KEY MISSING
+            </span>
+          )}
+          {liveTokensQ.isError && (
+            <span style={{ background:"rgba(255,51,102,0.12)", border:`1px solid rgba(255,51,102,0.25)`, borderRadius:5, padding:"2px 6px", fontSize:8, fontWeight:700, color:"#ff3366", letterSpacing:"0.3px" }}>
+              BAGS API OFFLINE
+            </span>
+          )}
           {jitoEnabled && (
             <span style={{ background:"rgba(153,69,255,0.15)", border:`1px solid rgba(153,69,255,0.3)`, borderRadius:5, padding:"2px 6px", fontSize:8, fontWeight:700, color:"#9945ff", letterSpacing:"0.3px" }}>⬡ Jito</span>
           )}
@@ -217,7 +242,7 @@ export default function App() {
       {/* Pages */}
       <div style={{ position:"relative", zIndex:1 }}>
         {page === "feed" && (
-          <TokenFeed tokens={tokens} liveTokens={liveTokens} filter={filter} onFilter={setFilter}
+          <TokenFeed tokens={tokens} liveTokens={liveTokensQ.data ?? []} liveTokensLoading={liveTokensQ.isLoading} filter={filter} onFilter={setFilter}
             onSelect={t => { setSel(t); setAiAnalysis(null); setPage("token") }} />
         )}
         {page === "token" && sel && (

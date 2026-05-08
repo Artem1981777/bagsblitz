@@ -2,10 +2,12 @@ import { C, glass, mono, pill } from "../theme"
 import type { Token } from "../types"
 import { fmt, ago, BBLITZ_MINT } from "../data"
 import { MiniChart } from "./MiniChart"
+import type { LiveTokenTicker } from "../lib/bagsApi"
 
-export function TokenFeed({ tokens, liveTokens, filter, onFilter, onSelect }: {
+export function TokenFeed({ tokens, liveTokens, liveTokensLoading, filter, onFilter, onSelect }: {
   tokens: Token[]
-  liveTokens: any[]
+  liveTokens: LiveTokenTicker[]
+  liveTokensLoading?: boolean
   filter: "hot" | "new" | "top"
   onFilter: (f: "hot" | "new" | "top") => void
   onSelect: (t: Token) => void
@@ -41,13 +43,21 @@ export function TokenFeed({ tokens, liveTokens, filter, onFilter, onSelect }: {
       </div>
 
       {/* Live ticker */}
-      {liveTokens.length > 0 && (
+      {(liveTokensLoading || liveTokens.length > 0) && (
         <div style={{ ...glass, padding: "7px 12px", marginBottom: 10, overflowX: "auto", scrollbarWidth: "none", display: "flex", gap: 16 }}>
-          {liveTokens.slice(0, 8).map((t: any, i: number) => (
+          {liveTokensLoading && liveTokens.length === 0 && Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} style={{ flexShrink: 0, display: "flex", gap: 6, alignItems: "center" }}>
+              <span style={{ width: 46, height: 10, borderRadius: 6, background: "rgba(255,255,255,0.06)" }} />
+              <span style={{ width: 70, height: 10, borderRadius: 6, background: "rgba(20,241,149,0.08)" }} />
+            </div>
+          ))}
+          {liveTokens.slice(0, 8).map((t, i) => (
             <div key={i} style={{ flexShrink: 0, display: "flex", gap: 4 }}>
               <span style={{ fontSize: 10, color: C.textMuted, ...mono }}>${t.symbol || t.ticker}</span>
               <span style={{ fontSize: 10, fontWeight: 700, color: C.green, ...mono }}>
-                {t.price ? "$" + parseFloat(t.price).toFixed(8) : ""}
+                {t.price != null && t.price !== ""
+                  ? "$" + (typeof t.price === "number" ? t.price : parseFloat(t.price)).toFixed(8)
+                  : ""}
               </span>
             </div>
           ))}
