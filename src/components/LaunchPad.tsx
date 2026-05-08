@@ -102,6 +102,12 @@ export function LaunchPad({ wallet, onLaunch, onConnect, onToast }: {
     { n: 3, label: "Launch" },
   ]
 
+  const fields: { l: string; k: keyof LaunchForm; ph: string; multi?: true }[] = [
+    { l: "Token Name", k: "name", ph: "Creator Fund" },
+    { l: "Symbol", k: "symbol", ph: "CFUND" },
+    { l: "Description", k: "desc", ph: "What does your token fund? What do holders earn? Include a roadmap.", multi: true },
+  ]
+
   return (
     <div style={{ padding: 12, position: "relative", zIndex: 1 }}>
       <div style={{ marginBottom: 16 }}>
@@ -145,17 +151,13 @@ export function LaunchPad({ wallet, onLaunch, onConnect, onToast }: {
             <Brain size={14} /> {aiName ? "Generating..." : "✨ AI Generate Name & Description"}
           </button>
 
-          {[
-            { l: "Token Name", k: "name", ph: "Creator Fund" },
-            { l: "Symbol", k: "symbol", ph: "CFUND" },
-            { l: "Description", k: "desc", ph: "What does your token fund? What do holders earn? Include a roadmap.", multi: true },
-          ].map(f => (
+          {fields.map(f => (
             <div key={f.k} style={{ marginBottom: 12 }}>
               <div style={{ fontSize: 10, color: C.textMuted, marginBottom: 5, fontWeight: 600, letterSpacing: "0.8px" }}>{f.l.toUpperCase()}</div>
               {f.multi
-                ? <textarea value={(form as any)[f.k]} onChange={e => setForm(p => ({ ...p, [f.k]: e.target.value }))}
+                ? <textarea value={form[f.k]} onChange={e => setForm(p => ({ ...p, [f.k]: e.target.value }))}
                     placeholder={f.ph} style={{ ...input, height: 80 }} rows={3} />
-                : <input value={(form as any)[f.k]} onChange={e => setForm(p => ({ ...p, [f.k]: f.k === "symbol" ? e.target.value.toUpperCase() : e.target.value }))}
+                : <input value={form[f.k]} onChange={e => setForm(p => ({ ...p, [f.k]: f.k === "symbol" ? e.target.value.toUpperCase() : e.target.value }))}
                     placeholder={f.ph} style={input} />
               }
             </div>

@@ -20,6 +20,24 @@ function makeTxId() {
   return Math.random().toString(36).slice(2, 10)
 }
 
+type BagsTokenSnapshot = {
+  symbol?: unknown
+  ticker?: unknown
+  name?: unknown
+  image?: unknown
+  price?: unknown
+  volume?: unknown
+  vol?: unknown
+  bondingProgress?: unknown
+  bonding_progress?: unknown
+}
+
+function asNumber(v: unknown): number {
+  if (typeof v === "number") return v
+  if (typeof v === "string") return parseFloat(v || "0")
+  return 0
+}
+
 /** Infer transaction type from token state deltas */
 function classifyTx(
   volDelta: number,
@@ -79,15 +97,18 @@ function syntheticTx(tokens: Token[], jitoEnabled: boolean): TxEvent {
 /** Derive transaction events by diffing live API snapshots */
 function diffApiSnapshot(
   prev: Record<string, { volume: number; price: number; bondingProgress: number }>,
-  curr: any[],
+  curr: BagsTokenSnapshot[],
   jitoEnabled: boolean,
 ): TxEvent[] {
   const events: TxEvent[] = []
   for (const t of curr) {
-    const sym = t.symbol || t.ticker || "?"
-    const price = parseFloat(t.price || "0")
-    const volume = parseFloat(t.volume || t.vol || "0")
-    const bonding = parseFloat(t.bondingProgress || t.bonding_progress || "0")
+    const sym =
+      (typeof t.symbol === "string" ? t.symbol : undefined) ||
+      (typeof t.ticker === "string" ? t.ticker : undefined) ||
+      "?"
+    const price = asNumber(t.price)
+    const volume = asNumber(t.volume ?? t.vol)
+    const bonding = asNumber(t.bondingProgress ?? t.bonding_progress)
     const p = prev[sym]
     if (!p) continue
     const volDelta = volume - p.volume
@@ -105,8 +126,8 @@ function diffApiSnapshot(
       timestamp: Date.now(),
       type,
       tokenSymbol: sym,
-      tokenName: t.name || sym,
-      tokenImage: t.image || "💎",
+      tokenName: typeof t.name === "string" ? t.name : sym,
+      tokenImage: typeof t.image === "string" ? t.image : "💎",
       solAmount: parseFloat(sol.toFixed(3)),
       usdAmount: parseFloat((sol * SOL_USD).toFixed(2)),
       walletAddr: fakeWallet(),
@@ -168,25 +189,31 @@ export function useTransactionFeed(tokens: Token[], jitoEnabled: boolean) {
   useEffect(() => {
     async function poll() {
       try {
+        const headers: HeadersInit = BAGS_KEY ? { "x-api-key": BAGS_KEY } : {}
         const res = await fetch(BAGS_API + "/tokens?limit=20&sort=volume", {
-          headers: { "x-api-key": BAGS_KEY },
+          headers,
           signal: AbortSignal.timeout(4000),
         })
         const data = await res.json()
-        const list: any[] = data.data || data.tokens || []
+        const list: BagsTokenSnapshot[] = (data?.data || data?.tokens || []) as BagsTokenSnapshot[]
         if (list.length === 0) return
         const events = diffApiSnapshot(prevSnapshot.current, list, jitoEnabled)
         events.forEach(pushTx)
         // Update snapshot
         for (const t of list) {
-          const sym = t.symbol || t.ticker || "?"
+          const sym =
+            (typeof t.symbol === "string" ? t.symbol : undefined) ||
+            (typeof t.ticker === "string" ? t.ticker : undefined) ||
+            "?"
           prevSnapshot.current[sym] = {
-            volume: parseFloat(t.volume || "0"),
-            price: parseFloat(t.price || "0"),
-            bondingProgress: parseFloat(t.bondingProgress || "0"),
+            volume: asNumber(t.volume ?? t.vol),
+            price: asNumber(t.price),
+            bondingProgress: asNumber(t.bondingProgress ?? t.bonding_progress),
           }
         }
-      } catch {}
+      } catch (err) {
+        void err
+      }
     }
     poll()
     const id = setInterval(poll, 4000)

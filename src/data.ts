@@ -1,7 +1,7 @@
 import type { Token } from "./types"
 
 export const BAGS_API = "https://public-api-v2.bags.fm/api/v1"
-export const BAGS_KEY = (import.meta as any).env.VITE_BAGS_KEY
+export const BAGS_KEY = import.meta.env.VITE_BAGS_KEY
 export const BBLITZ_MINT = "GiiRMcD1Ci4o6vP3evycKTrpjYQfScL4xobmkNMcBAGS"
 
 export const rand = (t: Token): Token => {

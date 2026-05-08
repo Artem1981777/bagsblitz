@@ -39,6 +39,8 @@ const THOUGHT_TEMPLATES = [
   ]},
 ]
 
+const ROYALTY_BASE_TS = Date.now()
+
 /** Craft a dynamic thought from a live TxEvent */
 function thoughtFromTx(tx: TxEvent): Omit<AgentThought, "id" | "timestamp"> {
   const sol = tx.solAmount.toFixed(tx.solAmount >= 10 ? 1 : 3)
@@ -110,12 +112,12 @@ export function useAgent() {
     { id:"y3", protocol:"Meteora DLMM",  tokenA:"USDC", tokenB:"BONK", tvl:412,  apy:89.1, earned:0.018, status:"rebalancing" },
   ])
 
-  const [royalties] = useState<RoyaltyEntry[]>([
-    { tokenSymbol:"GGLD",   tokenName:"Gaming Guild",  amount:0.042, usdValue:6.80, claimedAt:Date.now()-3600000,  reinvested:true  },
-    { tokenSymbol:"CREATE", tokenName:"Creator Coin",  amount:0.018, usdValue:2.91, claimedAt:Date.now()-7200000,  reinvested:true  },
-    { tokenSymbol:"MUSIC",  tokenName:"Music DAO",     amount:0.009, usdValue:1.46, claimedAt:Date.now()-14400000, reinvested:false },
-    { tokenSymbol:"BBLITZ", tokenName:"BagsBlitz",     amount:0.003, usdValue:0.49, claimedAt:Date.now()-28800000, reinvested:true  },
-  ])
+  const [royalties] = useState<RoyaltyEntry[]>(() => ([
+    { tokenSymbol:"GGLD",   tokenName:"Gaming Guild",  amount:0.042, usdValue:6.80, claimedAt:ROYALTY_BASE_TS-3600000,  reinvested:true  },
+    { tokenSymbol:"CREATE", tokenName:"Creator Coin",  amount:0.018, usdValue:2.91, claimedAt:ROYALTY_BASE_TS-7200000,  reinvested:true  },
+    { tokenSymbol:"MUSIC",  tokenName:"Music DAO",     amount:0.009, usdValue:1.46, claimedAt:ROYALTY_BASE_TS-14400000, reinvested:false },
+    { tokenSymbol:"BBLITZ", tokenName:"BagsBlitz",     amount:0.003, usdValue:0.49, claimedAt:ROYALTY_BASE_TS-28800000, reinvested:true  },
+  ]))
 
   const addThought = useCallback((thought: Omit<AgentThought, "id" | "timestamp">) => {
     const t: AgentThought = {
@@ -125,7 +127,7 @@ export function useAgent() {
     }
     setThoughts(prev => {
       const next = [t, ...prev].slice(0, 80)
-      try { localStorage.setItem(AGENT_THOUGHTS_KEY, JSON.stringify(next)) } catch {}
+      try { localStorage.setItem(AGENT_THOUGHTS_KEY, JSON.stringify(next)) } catch (err) { void err }
       return next
     })
   }, [])

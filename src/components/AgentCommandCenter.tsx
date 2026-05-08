@@ -6,6 +6,7 @@ import { SecuritySuite } from "./SecuritySuite"
 import { Dashboard } from "./Dashboard"
 import { WhaleFeed } from "./WhaleFeed"
 import { TradeQueue } from "./TradeQueue"
+import { useNow } from "../hooks/useNow"
 import type { AgentThought, YieldPosition, RoyaltyEntry, Token, TxEvent, JitoBundle, TradeQueueEntry } from "../types"
 
 type CenterTab = "stream" | "whales" | "queue" | "security" | "yield" | "dashboard"
@@ -47,6 +48,7 @@ export function AgentCommandCenter({
   onCopyTrade: (tx: TxEvent) => void
 }) {
   const [tab, setTab] = useState<CenterTab>("stream")
+  const now = useNow(1000)
 
   // When Copy Trade is triggered from the Whale Feed, switch to Queue tab
   const handleCopyTrade = useCallback((tx: TxEvent) => {
@@ -55,7 +57,7 @@ export function AgentCommandCenter({
   }, [onCopyTrade])
 
   // Badges
-  const newWhales     = txEvents.filter(t => t.isWhale && Date.now() - t.timestamp < 15000).length
+  const newWhales     = txEvents.filter(t => t.isWhale && now - t.timestamp < 15000).length
   const readyQueue    = tradeQueue.filter(e => e.status === "queued").length
   const blockedQueue  = tradeQueue.filter(e => e.status === "blocked").length
   const validatingCnt = tradeQueue.filter(e => e.status === "validating").length
