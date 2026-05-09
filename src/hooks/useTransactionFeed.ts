@@ -190,7 +190,7 @@ export function useTransactionFeed(tokens: Token[], jitoEnabled: boolean) {
     async function poll() {
       try {
         const headers: HeadersInit = BAGS_KEY ? { "x-api-key": BAGS_KEY } : {}
-        const res = await fetch(BAGS_API + "/tokens?limit=20&sort=volume", {
+        const res = await fetch(BAGS_API + "/token-launch/claim-txs/v2", {
           headers,
           signal: AbortSignal.timeout(4000),
         })
