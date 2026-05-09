@@ -7,10 +7,6 @@ export type LiveTokenTicker = {
 }
 
 export async function fetchLiveTokens(): Promise<LiveTokenTicker[]> {
-  const headers: HeadersInit = BAGS_KEY ? { "x-api-key": BAGS_KEY } : {}
-  const res = await fetch(BAGS_API + "/token-launch/claim-txs/v2", { headers })
-  if (!res.ok) throw new Error(`Bags API error (${res.status})`)
-  const data = await res.json()
-  return (data?.data || data?.tokens || []) as LiveTokenTicker[]
+  // Bags API public listing endpoint not available
+  return []
 }
-
